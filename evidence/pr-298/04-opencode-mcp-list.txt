@@ -1,0 +1,24 @@
+Real OpenCode CLI, the office's own config, on a throwaway stand-in for the office's
+MCP endpoint. Nothing here is a mock of opencode: this is opencode's output.
+
+$ opencode --version
+1.19.3
+
+# What the office hands an OpenCode agent (server/clis.ts, case 'opencode'): the office MCP
+# server as a remote one, in OPENCODE_CONFIG_CONTENT. This URL points at a local stand-in for
+# the office's /api/mcp/:token endpoint, because a demo office's CEO session is faked
+# in-process and never opens that endpoint.
+$ OPENCODE_CONFIG_CONTENT='{"mcp":{"office":{"type":"remote","url":"http://127.0.0.1:4488/mcp","enabled":true}},"autoupdate":false}'
+
+$ opencode mcp list        # (the manager's own MCP servers elided)
+●  ✓ office connected
+│      http://127.0.0.1:4488/mcp
+└  9 server(s)
+
+# What the server saw opencode do:
+<- initialize
+<- notifications/initialized
+<- tools/list
+
+So the office's OpenCode config is one the real CLI accepts, and it connects and asks for the
+office's tools on its own. An agent with no office (every floor agent) gets no `mcp` key at all.
