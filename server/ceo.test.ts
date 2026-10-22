@@ -412,7 +412,7 @@ describe('IssueCap', () => {
 });
 
 describe('the CEO prompt names its tools the way the running CLI does', () => {
-  const prompt = (cli: 'claude' | 'codex' | 'opencode') =>
+  const prompt = (cli: 'claude' | 'codex' | 'opencode' | 'copilot') =>
     ceoSystemPrompt({
       name: 'Ada',
       company: 'Acme',
@@ -422,7 +422,7 @@ describe('the CEO prompt names its tools the way the running CLI does', () => {
       maxAgents: 4,
       scaling: 'approve',
       tools: officeToolPrefix(cli),
-      readViaOffice: cli === 'codex',
+      readViaOffice: cli === 'codex' || cli === 'copilot',
       saveNotesViaOffice: cli !== 'claude',
     });
 
@@ -430,6 +430,7 @@ describe('the CEO prompt names its tools the way the running CLI does', () => {
     expect(officeToolPrefix('claude')).toBe('mcp__office__');
     expect(officeToolPrefix('codex')).toBe('mcp__office__'); // Codex namespaces MCP tools the same way
     expect(officeToolPrefix('opencode')).toBe('office_');
+    expect(officeToolPrefix('copilot')).toBe('office-');
   });
 
   it('never leaves a tool name the CEO cannot call', () => {
@@ -438,6 +439,7 @@ describe('the CEO prompt names its tools the way the running CLI does', () => {
     expect(prompt('codex')).toContain('mcp__office__list_directory and mcp__office__read_file');
     expect(prompt('codex')).toContain('update it with mcp__office__save_notes');
     expect(prompt('opencode')).toContain('update it with office_save_notes');
+    expect(prompt('copilot')).toContain('office-list_directory and office-read_file');
     for (const cli of ['claude', 'opencode'] as const) {
       const p = prompt(cli);
       const named = [...p.matchAll(/(?:mcp__office__|office_)([a-z_]+)/g)].map((m) => m[0]);

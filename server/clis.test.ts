@@ -32,6 +32,9 @@ describe('nextSession', () => {
 
   it('runs an agent with no pick of their own on the office default', () => {
     expect(nextSession(agent, { runtime: 'terminal', defaultCli: 'codex' }, true).cli).toBe('codex');
+    expect(nextSession(agent, { runtime: 'terminal', defaultCli: 'copilot' }, true).cli).toBe('copilot');
+    expect(nextSession({ ...agent, cli: 'copilot', sessionCli: 'codex' }, terminal, true, 'codex-1')).toEqual({ cli: 'copilot', resume: undefined });
+    expect(nextSession({ ...agent, cli: 'copilot', sessionCli: 'copilot' }, terminal, true, 'copilot-1')).toEqual({ cli: 'copilot', resume: 'copilot-1' });
   });
 
   it('keeps a Claude session in the Agent SDK, which only ever runs Claude Code', () => {
@@ -137,6 +140,7 @@ describe('launchArgs', () => {
     notify: { script: 'notify.cjs', url: 'http://127.0.0.1:1/api/hooks/t' },
     codexHook: 'codex-hook.cjs',
     plugin: 'file:///plugin.mjs',
+    copilotPlugin: 'copilot-plugin',
     browser: null,
     office: null,
     ...patch,
@@ -289,6 +293,27 @@ describe('launchArgs', () => {
       playwright: { type: 'local', command: ['npx', '-y', '@playwright/mcp@latest'], enabled: true },
       office: { type: 'remote', url: office.url, enabled: true },
     });
+    const copilot = launchArgs('copilot', ctx({ role: 'ceo', office })).args;
+    expect(JSON.parse(copilot[copilot.indexOf('--additional-mcp-config') + 1]).mcpServers.office).toEqual({
+      type: 'http', url: office.url, tools: ['*'],
+    });
+    expect(copilot).toContain('--disable-builtin-mcps');
+    expect(copilot[copilot.indexOf('--available-tools') + 1]).toContain('office-company_status');
+    expect(copilot).not.toContain('--allow-all');
+  });
+
+  it('starts and resumes Copilot in its interactive terminal', () => {
+    const fresh = launchArgs('copilot', ctx({ model: 'gpt-6-astra', effort: 'high' }));
+    expect(fresh.args).toContain('--plugin-dir');
+    expect(fresh.args).toContain('--session-id');
+    expect(fresh.args.slice(-2)).toEqual(['--interactive', '--looks like a flag']);
+    expect(fresh.args).toContain('--allow-all');
+    expect(fresh.args).toContain('--model');
+    expect(fresh.args).toContain('--reasoning-effort');
+    expect(fresh.env.COPILOT_AUTO_UPDATE).toBe('false');
+    const resumed = launchArgs('copilot', ctx({ resumeId: '22222222-2222-2222-2222-222222222222' })).args;
+    expect(resumed.slice(resumed.indexOf('--resume'), resumed.indexOf('--resume') + 2)).toEqual(['--resume', '22222222-2222-2222-2222-222222222222']);
+    expect(resumed).not.toContain('--session-id');
   });
 
   it('runs Codex on a local model through its own --oss, or a provider of the office\'s', () => {
