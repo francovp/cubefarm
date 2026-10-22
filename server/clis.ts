@@ -22,6 +22,7 @@ export const CLIS: CliDef[] = [
   { id: 'claude', label: 'Claude Code', command: 'claude', integrated: true },
   { id: 'codex', label: 'Codex', command: 'codex', integrated: false },
   { id: 'opencode', label: 'OpenCode', command: 'opencode', integrated: false },
+  { id: 'copilot', label: 'GitHub Copilot CLI', command: 'copilot', integrated: false },
 ];
 
 export const isCli = (v: unknown): v is AgentCli => CLIS.some((c) => c.id === v);
@@ -167,6 +168,7 @@ export interface LaunchContext {
   /** Codex's hook program: forwards each hook to the office (notify.url). */
   codexHook: string;
   plugin: string; // file URL of the OpenCode plugin
+  copilotPlugin: string; // per-session hooks and instructions for Copilot CLI
   /** The Playwright MCP server, when the floor tests in a browser. Claude Code gets it through its MCP config file. */
   browser: { command: string; args: string[] } | null;
   /** The office's own MCP server (the CEO's tools), over HTTP at a token URL. Claude Code reads it from its MCP config file. */
@@ -257,6 +259,12 @@ export function writeOpenCodeVariantState(stateHome: string, model: string, effo
 
 /** A resumed OpenCode TUI accepts terminal input only after its composer has rendered. */
 export const openCodePromptReady = (screen: string): boolean => /ctrl\+p\s+commands/i.test(screen);
+
+const COPILOT_OFFICE_TOOLS = [
+  'list_directory', 'read_file', 'save_notes', 'company_status', 'agent_detail', 'set_floor_profile',
+  'scale_team', 'configure_agent', 'file_issue', 'set_dependencies', 'close_issue', 'retry_qa',
+  'send_back', 'rerun_checks', 'close_pull', 'escalate',
+].map((name) => `office-${name}`).join(',');
 
 /** Codex hooks the office listens to: its steps, and Esc interrupting a turn. Turn endings come from notify. */
 export const CODEX_HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Interrupt'];
@@ -354,6 +362,24 @@ export function launchArgs(id: AgentCli, ctx: LaunchContext): Launch {
       ];
       return { args, env: { OPENCODE_CONFIG_CONTENT: JSON.stringify(config), CUBEFARM_NOTIFY_URL: ctx.notify.url, CUBEFARM_OPENCODE_VARIANT: ctx.effort } };
     }
+    case 'copilot': {
+      const servers: Record<string, unknown> = {};
+      if (ctx.browser) servers.playwright = { type: 'local', command: ctx.browser.command, args: ctx.browser.args, tools: ['*'] };
+      if (ctx.office) servers.office = { type: 'http', url: ctx.office.url, tools: ['*'] };
+      const args = [
+        '--no-auto-update', '--no-ask-user', '--plugin-dir', ctx.copilotPlugin, '--agent', 'cubefarm-session',
+        ...(ctx.resumeId ? ['--resume', ctx.resumeId] : ['--session-id', ctx.sessionId, '--name', ctx.name]),
+        ...(ctx.model ? ['--model', ctx.model] : []),
+        ...(ctx.effort ? ['--reasoning-effort', ctx.effort] : []),
+        ...ctx.additionalDirectories.flatMap((d) => ['--add-dir', d]),
+        ...(Object.keys(servers).length ? ['--additional-mcp-config', JSON.stringify({ mcpServers: servers })] : []),
+        ...(ctx.role === 'ceo'
+          ? ['--disable-builtin-mcps', '--available-tools', COPILOT_OFFICE_TOOLS, '--allow-tool', 'office', '--deny-tool', 'shell,write']
+          : ['--allow-all']),
+        '--interactive', ctx.prompt,
+      ];
+      return { args, env: { COPILOT_AUTO_UPDATE: 'false' } };
+    }
   }
 }
 
@@ -390,7 +416,7 @@ export function codexThread(action: 'archive' | 'unarchive', id: string, after?:
 
 // ---------- prompts the office answers ----------
 
-const TRUST_PROMPT = /Quick safety check|Do you trust the (files|contents) (in|of) this|trust this folder|allow Codex to work in this folder/i;
+const TRUST_PROMPT = /Quick safety check|Do you trust the (files|contents) (in|of) this|Do you trust (this|the) (directory|folder|files)|trust this folder|allow Codex to work in this folder/i;
 
 /**
  * The key that moves a CLI's folder-trust question toward trusting the office's own worktree: Enter when the

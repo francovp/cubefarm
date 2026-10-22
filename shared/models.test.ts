@@ -24,6 +24,8 @@ describe('effectiveModel', () => {
     expect(effectiveModel('gpt-5.5-codex', 'opencode', claudeOffice, 'claude-opus-5-5')).toBe('gpt-5.5-codex');
     expect(effectiveModel('anthropic/claude-opus-5-5', 'codex', claudeOffice, 'claude-opus-5-5')).toBe('');
     expect(effectiveModel('anthropic/claude-opus-5-5', 'opencode', claudeOffice, 'claude-opus-5-5')).toBe('anthropic/claude-opus-5-5');
+    expect(effectiveModel('claude-opus-5-5', 'copilot', claudeOffice, 'claude-opus-5-5')).toBe('');
+    expect(effectiveModel('gpt-6-astra', 'copilot', claudeOffice, 'claude-opus-5-5')).toBe('gpt-6-astra');
   });
 
   it("reads a bare model name for OpenCode as its provider's, and never a Claude name", () => {

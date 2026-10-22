@@ -143,6 +143,13 @@ function checks() {
     out.push({ name: 'Claude', ok, detail: ok ? `signed in${status.subscriptionType ? ` (${status.subscriptionType})` : ''}` : 'not signed in', fix: 'run: npx cubefarm login' });
   }
 
+  const copilot = sh('copilot', ['--version']);
+  out.push({
+    name: 'GitHub Copilot CLI (optional)', ok: copilot.status === 0, optional: true,
+    detail: copilot.status === 0 ? copilot.stdout?.trim().split(/\r?\n/)[0] : 'not installed',
+    fix: 'install GitHub Copilot CLI and run: copilot login',
+  });
+
   // Agents test in a browser through Playwright, which drives Google Chrome by default.
   const chrome = chromePaths().some((p) => fs.existsSync(p));
   out.push({ name: 'Chrome', ok: chrome, detail: chrome ? 'for browser testing' : 'Google Chrome not found', fix: 'install Google Chrome so agents can test in a browser' });
@@ -166,7 +173,7 @@ function chromePaths() {
   return ['/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable'];
 }
 
-const printCheck = (c) => console.log(`  ${c.ok ? green('✓') : red('✗')} ${c.name.padEnd(12)} ${c.detail ? dim(c.detail) : ''}${c.ok ? '' : `  → ${c.fix}`}`);
+const printCheck = (c) => console.log(`  ${c.ok ? green('✓') : c.optional ? dim('○') : red('✗')} ${c.name.padEnd(12)} ${c.detail ? dim(c.detail) : ''}${c.ok || c.optional ? '' : `  → ${c.fix}`}`);
 
 // ---------- helpers ----------
 
@@ -239,7 +246,7 @@ if (command === 'doctor') {
   console.log(`\n  cubefarm ${pkg.version}\n`);
   const results = checks();
   results.forEach(printCheck);
-  const ok = results.every((c) => c.ok);
+  const ok = results.every((c) => c.ok || c.optional);
   console.log(ok ? `\n  All set. Start the office with: npx cubefarm\n` : '');
   process.exit(ok ? 0 : 1);
 }
@@ -272,7 +279,7 @@ if (port !== 0 && (await portOpen(port, local))) {
 }
 
 if (!demo) {
-  const problems = checks().filter((c) => !c.ok);
+  const problems = checks().filter((c) => !c.ok && !c.optional);
   if (problems.length) {
     console.log('');
     problems.forEach(printCheck);
