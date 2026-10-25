@@ -2697,11 +2697,14 @@ export class Swarm {
     return repo.links.map((id) => this.state.repos.find((r) => r.id === id)).filter((r): r is PersistedRepo => !!r);
   }
 
-  /** How an agent's next session runs: the CLI in their terminal (the terminal runtime), or Claude Code through the SDK. */
-  private sessionRuntime(a: PersistedAgent, resume?: string): { terminal?: AgentTerminal; cli?: AgentCli; label?: string; resumeSessionId?: string } {
+  /**
+   * How an agent's next session runs: the CLI in their terminal (the terminal runtime), or Claude Code through the SDK.
+   * live: the session is already running in its CLI (typed at its prompt, or kept working through a restart).
+   */
+  private sessionRuntime(a: PersistedAgent, resume?: string, live = false): { terminal?: AgentTerminal; cli?: AgentCli; label?: string; resumeSessionId?: string } {
     // A cloud agent's CLI always runs in its Box; the CEO always stays local.
     const inTerminal = a.host === 'box' || (this.state.settings.runtime === 'terminal' && this.backend.terminals);
-    const { cli, resume: resumeId } = nextSession(a, this.state.settings, inTerminal, resume);
+    const { cli, resume: resumeId } = nextSession(a, this.state.settings, inTerminal, resume, live);
     if (!inTerminal) return { resumeSessionId: resumeId };
     const what = a.role === 'ceo' ? a.issueTitle : a.task === 'qa' ? `QA · PR #${a.prNumber}` : a.task === 'fix' ? `fixing PR #${a.prNumber}` : a.issueNumber ? `#${a.issueNumber} ${a.issueTitle ?? ''}` : null;
     return { terminal: this.terminalFor(a), cli, label: `${a.name}${what ? ` · ${what}` : ''}`.slice(0, 80).trim(), resumeSessionId: resumeId };
@@ -2960,7 +2963,7 @@ export class Swarm {
     // A cloud agent's session runs in their Box: it's awake and set up, their linked repos fetched there, and their
     // credentials resolved first. (Following a CLI that kept working there needs none of that.)
     if (a.host === 'box' && mode !== 'reattach') {
-      const cli = this.sessionRuntime(a, resumeSessionId).cli ?? 'claude';
+      const cli = this.sessionRuntime(a, resumeSessionId, mode === 'typed').cli ?? 'claude';
       const note = (text: string) => this.appendLog(a, [{ kind: 'system', text }]);
       void this.boxTarget(a, cli, repo.browserTesting, mode !== 'typed')
         .then(async (box) => {
@@ -3002,7 +3005,7 @@ export class Swarm {
     }
     a.status = 'working';
     this.activity.set(a.id, Date.now());
-    const how = this.sessionRuntime(a, resumeSessionId);
+    const how = this.sessionRuntime(a, resumeSessionId, mode !== null);
     this.emitAgent(a);
     const active = (entries: LogEntry[]) => {
       if (entries.some((e) => e.kind !== 'manager')) this.activity.set(a.id, Date.now());

@@ -331,7 +331,7 @@ function fakeSession(opts: SessionOptions, cb: SessionCallbacks, fullName: strin
   const pushes = kind !== 'fix' || !(nudged || /FAILED|taking over pull request/.test(opts.prompt)) || Math.random() > (nudged ? 0.5 : 0.25);
 
   const header: Step = [
-    { kind: 'system', text: `✻ Claude Code (demo) · ${opts.model} · ${opts.effort} effort` },
+    { kind: 'system', text: `✻ ${cliLabel(opts.cli ?? 'claude')} (demo) · ${opts.model || 'default model'} · ${opts.effort} effort` },
     { kind: 'system', text: `  cwd ${opts.cwd}` },
   ];
   const checks = opts.prompt.match(/^GitHub checks right now: .*$/m)?.[0] ?? 'GitHub checks right now: none';
@@ -1337,7 +1337,7 @@ function ceoSession(opts: SessionOptions, cb: SessionCallbacks): SessionHandle {
   timers.push(
     setTimeout(async () => {
       try {
-        cb.log([{ kind: 'system', text: `✻ ${cliLabel(opts.cli ?? 'claude')} (demo) · ${opts.model} · ${opts.effort} effort · CEO` }]);
+        cb.log([{ kind: 'system', text: `✻ ${cliLabel(opts.cli ?? 'claude')} (demo) · ${opts.model || 'default model'} · ${opts.effort} effort · CEO` }]);
         const reply = await run();
         cb.log([{ kind: 'text', text: `● ${reply}` }]);
         cb.turn?.(reply);
