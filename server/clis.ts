@@ -33,15 +33,19 @@ export const cliLabel = (id: AgentCli) => CLIS.find((c) => c.id === id)?.label ?
  * so a follow-up normally stays with that CLI. When the manager has since changed the agent's coding agent, though, their
  * pick wins: the next session starts fresh on it, rather than a terminal quietly running the CLI the old session belongs to
  * while the dropdown says something else. The Agent SDK is Claude Code, so there a Claude session stays resumable either way.
+ * live: the session is already running in its CLI's terminal (the manager typed at its prompt, or it kept working through
+ * a restart). That CLI is followed whatever the pick: starting the new one would kill the one doing the work.
  */
 export function nextSession(
   a: { role: AgentRole; cli: AgentCli | ''; sessionCli: AgentCli | null },
   settings: { runtime: AgentRuntime; defaultCli: AgentCli },
   inTerminal: boolean,
   resume?: string,
+  live = false,
 ): { cli: AgentCli; resume: string | undefined } {
   const cli: AgentCli = a.role === 'ceo' ? a.cli || 'claude' : a.cli || settings.defaultCli;
   if (!resume || !a.sessionCli || a.sessionCli === cli) return { cli, resume };
+  if (inTerminal && live) return { cli: a.sessionCli, resume };
   const keep = !inTerminal && a.sessionCli === 'claude';
   return { cli, resume: keep ? resume : undefined };
 }

@@ -41,6 +41,14 @@ describe('nextSession', () => {
     expect(nextSession({ ...agent, cli: 'opencode', sessionCli: 'claude' }, sdk, false, 'claude-1')).toEqual({ cli: 'opencode', resume: 'claude-1' });
     expect(nextSession({ ...agent, cli: '', sessionCli: 'codex' }, sdk, false, 'codex-1').resume).toBe(undefined);
   });
+
+  it('follows a session already running in its CLI, whatever the agent picked since', () => {
+    // The manager typed at the Claude Code prompt, or Claude Code kept working through a restart: switching to the new
+    // pick here would kill the CLI doing the work and mislabel its session as OpenCode's.
+    expect(nextSession({ ...agent, cli: 'opencode', sessionCli: 'claude' }, terminal, true, 'claude-1', true)).toEqual({ cli: 'claude', resume: 'claude-1' });
+    // Nothing running to follow: the pick wins as usual.
+    expect(nextSession({ ...agent, cli: 'opencode', sessionCli: 'claude' }, terminal, true, undefined, true)).toEqual({ cli: 'opencode', resume: undefined });
+  });
 });
 
 describe('unwrapCmdShim', () => {
