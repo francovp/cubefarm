@@ -319,7 +319,8 @@ export function launchArgs(id: AgentCli, ctx: LaunchContext): Launch {
         ...codexLocal(ctx.model, toml),
         ...(ctx.effort ? ['-c', `model_reasoning_effort=${toml(EFFORT_CODEX[ctx.effort])}`] : []),
         ...(ctx.browser ? ['-c', `mcp_servers.playwright={command=${toml(ctx.browser.command)},args=[${ctx.browser.args.map(toml).join(',')}]}`] : []),
-        ...(ctx.office ? ['-c', `mcp_servers.office={url=${toml(ctx.office.url)}}`] : []),
+        // The office handlers enforce their own scope; approval_policy=never cannot answer MCP prompts.
+        ...(ctx.office ? ['-c', `mcp_servers.office={url=${toml(ctx.office.url)},default_tools_approval_mode="approve"}`] : []),
         ...CODEX_HOOK_EVENTS.flatMap((e) => ['-c', `hooks.${e}=[{hooks=[{type="command",command=${toml(codexHookCommand(ctx.node ?? process.execPath, ctx.codexHook, ctx.posix ? false : WIN))},timeout=10}]}]`]),
         // The CEO reads repositories and writes notes through office MCP tools, without shell or filesystem writes.
         ...(ctx.role === 'ceo'

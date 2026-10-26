@@ -288,7 +288,7 @@ describe('launchArgs', () => {
     // Claude Code reads them from the MCP config file cliRunner wrote, so it takes no -c of its own.
     expect(launchArgs('claude', ctx({ office })).args.some((a) => a.startsWith('mcp_servers.office'))).toBe(false);
     const codex = launchArgs('codex', ctx({ office })).args;
-    expect(codex).toContain('mcp_servers.office={url="http://127.0.0.1:4317/api/mcp/tok"}');
+    expect(codex).toContain('mcp_servers.office={url="http://127.0.0.1:4317/api/mcp/tok",default_tools_approval_mode="approve"}');
     expect(launchArgs('codex', ctx()).args.some((a) => a.startsWith('mcp_servers.office'))).toBe(false);
     const config = (patch: Partial<LaunchContext>) => JSON.parse(launchArgs('opencode', ctx(patch)).env.OPENCODE_CONFIG_CONTENT);
     expect(config({ office }).mcp.office).toEqual({ type: 'remote', url: office.url, enabled: true });
