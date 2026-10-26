@@ -10,6 +10,7 @@ import { BOX_CDP, BoxPty, boxHooksReady, finishedTurn, lookAtBoxCli, readFrom, t
 import { BOX_BIN, BOX_CLI_BIN, BOX_HOME, boxSessionDir, signInCommand, tmuxKill } from './boxScripts.ts';
 import { BOX_ENV } from './cloud.ts';
 import { cliLabel, CLIS, CODEX_HOOK_SOURCE, codexThread, commandFor, hookReviewKey, interruptions, isCli, launchArgs, NOTIFY_SOURCE, openCodePromptReady, OPENCODE_PLUGIN_SOURCE, signedOutScreen, STATUSLINE_SOURCE, trustKey, writeOpenCodeVariantState } from './clis.ts';
+import { COPILOT_HOOK_SOURCE, writeCopilotPlugin } from './copilot.ts';
 import { adoptPty, discardPty, hooksReady as keeperHooksReady, keeperHookUrl, keeperPid, leaveKeeper, spawnPty, startKeeper, terminalsAvailable, type Pty } from './ptyClient.ts';
 import type { BoxApi } from './box.ts';
 import {
@@ -112,6 +113,7 @@ function writeHelpers() {
   fs.writeFileSync(path.join(BIN_DIR, 'notify.cjs'), NOTIFY_SOURCE);
   fs.writeFileSync(path.join(BIN_DIR, 'codex-hook.cjs'), CODEX_HOOK_SOURCE);
   fs.writeFileSync(path.join(BIN_DIR, 'opencode-plugin.mjs'), OPENCODE_PLUGIN_SOURCE);
+  fs.writeFileSync(path.join(BIN_DIR, 'copilot-hook.cjs'), COPILOT_HOOK_SOURCE);
   helpersWritten = true;
 }
 
@@ -694,6 +696,16 @@ export function startCliSession(opts: SessionOptions, callbacks: SessionCallback
         else if (prompt) log([{ kind: 'manager', text: `▶ Typed in the terminal: ${clip(prompt.split('\n')[0], 200)}` }]);
         return {};
       }
+      case 'SessionStart': {
+        if (cli === 'copilot' && typeof b.session_id === 'string' && b.session_id) {
+          cb.sessionId(b.session_id);
+          if (live) {
+            live.resumeId = b.session_id;
+            remember(live);
+          }
+        }
+        return {};
+      }
       case 'Stop': {
         const text = String(b.last_assistant_message ?? '').trim();
         turns += 1;
@@ -748,6 +760,7 @@ export function startCliSession(opts: SessionOptions, callbacks: SessionCallback
       case 'TurnError':
         turnError = `${label}: ${clip(String(b.error ?? 'error'), 200)}`;
         log([{ kind: 'error', text: `✗ ${turnError}` }]);
+        if (cli === 'copilot' && b.recoverable === false) finish({ ok: false, text: lastText, errors: [turnError] }, true);
         return {};
       case 'PromptAccepted':
         if (cli === 'opencode' && b.session_id === opts.resumeSessionId) {
@@ -767,7 +780,10 @@ export function startCliSession(opts: SessionOptions, callbacks: SessionCallback
       return;
     }
     const ok = exitCode === 0 && (lastText !== '' || (cli !== 'claude' && Date.now() - started > 20_000));
-    finish({ ok, text: lastText, errors: ok ? [] : [`${label} exited${exitCode ? ` with code ${exitCode}` : ''} before finishing.`] });
+    const signIn = cli === 'copilot' && /not logged in|authentication required|please (sign in|log in)|copilot login/i.test(term.screen());
+    finish({ ok, text: lastText, errors: ok ? [] : [signIn
+      ? `${label} needs sign-in. Run "copilot login" in your terminal, then retry.`
+      : `${label} exited${exitCode ? ` with code ${exitCode}` : ''} before finishing.`] });
   };
 
   const handle: SessionHandle = {
@@ -840,6 +856,7 @@ export function startCliSession(opts: SessionOptions, callbacks: SessionCallback
   const openCodeStateHome = path.join(dir, 'opencode-state');
   const boxFiles: [string, string][] = []; // written into the Box when the CLI starts
   const put = (file: string, text: string) => (box ? boxFiles.push([file, text]) : fs.writeFileSync(file, text));
+  let copilotPlugin = '';
   try {
     if (!box) {
       writeHelpers();
@@ -861,6 +878,7 @@ export function startCliSession(opts: SessionOptions, callbacks: SessionCallback
     put(files.settings, JSON.stringify(settings, null, 2));
     if (files.mcp) put(files.mcp, JSON.stringify({ mcpServers: servers }, null, 2));
     put(files.system, opts.systemAppend);
+    if (cli === 'copilot' && !box) copilotPlugin = writeCopilotPlugin(dir, opts.systemAppend, path.join(BIN_DIR, 'copilot-hook.cjs'), hookUrl);
     if (prompt.length > INLINE_PROMPT_MAX) {
       const file = p.join(dir, 'task.md');
       put(file, prompt);
@@ -887,6 +905,7 @@ export function startCliSession(opts: SessionOptions, callbacks: SessionCallback
     notify: box ? { script: `${BOX_BIN}/notify.cjs`, url: events } : { script: path.join(BIN_DIR, 'notify.cjs'), url: hookUrl },
     codexHook: box ? `${BOX_BIN}/codex-hook.cjs` : path.join(BIN_DIR, 'codex-hook.cjs'),
     plugin: box ? '' : pathToFileURL(path.join(BIN_DIR, 'opencode-plugin.mjs')).href,
+    copilotPlugin,
     browser,
     office: opts.office ? { url: `${officeUrl}/api/mcp/${token}` } : null,
     ...(box ? { node: 'node', posix: true } : {}),
@@ -951,7 +970,7 @@ export function startCliSession(opts: SessionOptions, callbacks: SessionCallback
         }
         quietly(() => pty.write('\r'));
       }
-      if (!nudged.has('login') && /Not logged in|run \/login|Select login method|Sign in with ChatGPT|Please login|Invalid API key/i.test(screen)) {
+      if (!nudged.has('login') && /Not logged in|Authentication required|Please (sign in|log in)|copilot login|run \/login|Select login method|Sign in with ChatGPT|Please login|Invalid API key/i.test(screen)) {
         nudged.add('login');
         // A cloud agent's CLI is signed in through the office's own sign-in, which then starts the task again.
         if (box) return finish({ ok: false, text: '', errors: [`${label} isn't signed in in their cloud machine.`], signedOut: true });

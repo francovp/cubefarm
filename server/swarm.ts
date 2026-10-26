@@ -2222,8 +2222,8 @@ export class Swarm {
     if (want === 'local') return 'local';
     const why = !this.cloud.boxApi()
       ? 'Cloud agents need your Upstash Box API key first: Settings → Cloud agents.'
-      : cli === 'opencode'
-        ? "OpenCode can't run in a cloud machine yet: give this agent Claude Code or Codex."
+      : cli === 'opencode' || cli === 'copilot'
+        ? `${cliLabel(cli)} can't run in a cloud machine yet: give this agent Claude Code or Codex.`
         : !this.boxRoom(moving)
           ? `Your Upstash plan's Box limit (${this.state.settings.cloud.boxLimit}) is reached. Raise it in Settings → Cloud agents if your plan allows more, or delete Boxes you don't need.`
           : null;
@@ -2285,13 +2285,14 @@ export class Swarm {
    * SignInNeeded), except for a prompt the manager already typed into the CLI.
    */
   private async boxTarget(a: PersistedAgent, cli: AgentCli, browserTesting: boolean, check = true): Promise<BoxTarget> {
+    if (cli !== 'claude' && cli !== 'codex') throw new Error(`${cliLabel(cli)} can't run in a cloud machine yet.`);
     const api = this.cloud.boxApi();
     if (!api) throw new Error('Cloud agents need your Upstash Box API key: Settings → Cloud agents.');
     const machine = this.machineOf(a);
     const boxId = await this.boxMachines.ensure(machine, (text) => this.appendLog(a, [{ kind: 'system', text: `☁ ${text}` }]));
     const creds = await this.cloud.credentials(cli);
     if (creds.missing.length) throw new Error(`Cloud agents can't sign in yet. Missing: ${creds.missing.join('; ')}.`);
-    if (check && creds.ownLogin && cli !== 'opencode' && (await this.boxMachines.signedIn(machine, cli).catch(() => null)) === false) throw new SignInNeeded(cli);
+    if (check && creds.ownLogin && (await this.boxMachines.signedIn(machine, cli).catch(() => null)) === false) throw new SignInNeeded(cli);
     // The Box's own Chromium starts with a first tab; Playwright attaches to it.
     const browser = browserTesting ? await api.browser(boxId).catch(() => false) : false;
     return { api, boxId, env: creds.env, apiKeyHelper: creds.apiKeyHelper, browser, record: (rec) => this.boxCliRecord(a.id, rec), connection: (up) => this.boxMachines.connection(machine, up) };
@@ -2397,7 +2398,7 @@ export class Swarm {
   private async startSignIn(a: PersistedAgent) {
     const cli = a.cli || this.state.settings.defaultCli;
     const api = this.cloud.boxApi();
-    if (!a.needsSignIn || a.host !== 'box' || cli === 'opencode' || !api) return;
+    if (!a.needsSignIn || a.host !== 'box' || (cli !== 'claude' && cli !== 'codex') || !api) return;
     const s = this.signInOf(a, cli);
     if (s.run || s.starting) return;
     s.starting = true;
@@ -2473,7 +2474,7 @@ export class Swarm {
       s?.run?.stop();
       if (s) s.run = null;
     }
-    if (cli === 'opencode') return this.signedIn(a);
+    if (cli !== 'claude' && cli !== 'codex') return this.signedIn(a);
     const creds = await this.cloud.credentials(cli).catch(() => null);
     const ok = !creds ? null : creds.ownLogin ? await this.boxMachines.signedIn(this.machineOf(a), cli).catch(() => null) : true;
     if (!this.state.agents.includes(a) || a.host !== 'box') return;
@@ -2537,10 +2538,11 @@ export class Swarm {
     if (patch.host !== undefined && a.role !== 'ceo' && (patch.host === 'box' || patch.host === 'local')) this.moveAgent(a, patch.host);
     if (patch.cli !== undefined) {
       const cli = isCli(patch.cli) ? patch.cli : '';
-      if (a.role !== 'ceo' && a.host === 'box' && (cli || this.state.settings.defaultCli) === 'opencode') throw new HttpError(400, `${a.name} works in the cloud, where OpenCode can't run yet: move them to this computer first.`);
+      if (a.role !== 'ceo' && a.host === 'box' && ['opencode', 'copilot'].includes(cli || this.state.settings.defaultCli)) throw new HttpError(400, `${a.name} works in the cloud, where ${cliLabel((cli || this.state.settings.defaultCli) as AgentCli)} can't run yet: move them to this computer first.`);
       if (cli && (a.role === 'ceo' || a.host !== 'box') && !this.cliReady(cli)) throw new HttpError(400, `${cliLabel(cli)} isn't installed on this computer.`);
       const changed = cli !== a.cli;
       // The CEO always runs a concrete coding agent; floor agents may inherit the office default.
+      if (changed && patch.model === undefined) a.model = '';
       a.cli = cli || (a.role === 'ceo' ? 'claude' : '');
       // Another coding agent in their Box has a login of its own (or needs one).
       if (changed && a.role !== 'ceo' && a.host === 'box') void this.checkSignIn(a, true);
@@ -3078,8 +3080,9 @@ export class Swarm {
   private async signedOutMidTask(a: PersistedAgent, repo: PersistedRepo, result: SessionResult, cli: AgentCli, again: () => void) {
     const rt = this.agentRt.get(a.id);
     if (!rt || !this.state.agents.includes(a)) return;
-    const creds = cli === 'opencode' ? null : await this.cloud.credentials(cli).catch(() => null);
-    if (cli === 'opencode' || !creds?.ownLogin || a.status === 'stopped' || this.dropping.has(a.id) || a.host !== 'box') {
+    if (cli !== 'claude' && cli !== 'codex') return this.onFinished(a, repo, result);
+    const creds = await this.cloud.credentials(cli).catch(() => null);
+    if (!creds?.ownLogin || a.status === 'stopped' || this.dropping.has(a.id) || a.host !== 'box') {
       // A key from Settings that was turned away has nothing to sign in here: the session failed like any other.
       const errors = creds && !creds.ownLogin ? [`${cliLabel(cli)} turned the key it was given away: check it in Settings → Cloud agents.`] : result.errors;
       return this.onFinished(a, repo, { ...result, errors });
@@ -3775,6 +3778,9 @@ export class Swarm {
     if (patch.sessionLimit !== undefined) s.sessionLimit = Math.max(0, Math.round(Number(patch.sessionLimit)) || 0);
     // The default model belongs to the default coding agent: a new agent starts on its own default.
     if (isCli(patch.defaultCli) && patch.defaultCli !== s.defaultCli) {
+      if ((patch.defaultCli === 'copilot' || patch.defaultCli === 'opencode') && this.state.agents.some((a) => a.role !== 'ceo' && a.host === 'box' && !a.cli)) {
+        throw new HttpError(400, `${cliLabel(patch.defaultCli)} can't run in a cloud machine yet: choose a CLI for each cloud agent before changing the office default.`);
+      }
       s.defaultCli = patch.defaultCli;
       if (patch.defaultModel === undefined) s.defaultModel = s.defaultCli === 'claude' ? DEFAULT_MODEL : '';
     }
@@ -4379,7 +4385,7 @@ export class Swarm {
 
   private ceoPromptInput(a: PersistedAgent, cli: AgentCli): Parameters<typeof ceoSystemPrompt>[0] {
     const s = this.state.settings;
-    return { name: a.name, company: s.companyName, manager: s.managerName, notesFile: path.join(CEO_DIR, 'NOTES.md'), sessionLimit: s.sessionLimit, maxAgents: s.maxAgents, scaling: s.scaling, tools: officeToolPrefix(cli), readViaOffice: cli === 'codex', saveNotesViaOffice: cli !== 'claude' };
+    return { name: a.name, company: s.companyName, manager: s.managerName, notesFile: path.join(CEO_DIR, 'NOTES.md'), sessionLimit: s.sessionLimit, maxAgents: s.maxAgents, scaling: s.scaling, tools: officeToolPrefix(cli), readViaOffice: cli === 'codex' || cli === 'copilot', saveNotesViaOffice: cli !== 'claude' };
   }
 
   private async runCeoJob(a: PersistedAgent, job: CeoJob) {

@@ -61,6 +61,7 @@ describe('the Playwright MCP server', () => {
       notify: { script: 'n.cjs', url: 'http://127.0.0.1:1/x' },
       codexHook: 'h.cjs',
       plugin: 'file:///p.mjs',
+      copilotPlugin: 'copilot-plugin',
       browser,
       office: null,
     };
@@ -69,6 +70,10 @@ describe('the Playwright MCP server', () => {
     expect(codex).not.toContain('npx');
     const opencode = JSON.parse(launchArgs('opencode', ctx).env.OPENCODE_CONFIG_CONTENT);
     expect(opencode.mcp.playwright.command).toEqual([browser.command, ...browser.args]);
+    const copilot = launchArgs('copilot', ctx).args;
+    expect(JSON.parse(copilot[copilot.indexOf('--additional-mcp-config') + 1]).mcpServers.playwright).toEqual({
+      type: 'local', command: browser.command, args: browser.args, tools: ['*'],
+    });
   });
 });
 
