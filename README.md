@@ -2,7 +2,7 @@
 
 A cartoon 3D office where a team of AI coding agents works through your GitHub issues. You walk the floors, look over their shoulders and watch their pull requests get tested and merged.
 
-Every agent is a real coding agent, **Claude Code, Codex or OpenCode**, running in a terminal of its own on your machine with your logins, settings, skills and MCP servers. Run the whole team on one, or give each agent its own. The office hands out the work, has every pull request reviewed and tested in a real browser, and merges what passes.
+Every agent is a real coding agent, **Claude Code, Codex, OpenCode or GitHub Copilot CLI**, running in a terminal of its own on your machine with your logins, settings, skills and MCP servers. Run the whole team on one, or give each agent its own. The office hands out the work, has every pull request reviewed and tested in a real browser, and merges what passes.
 
 ## Get started
 
@@ -18,7 +18,7 @@ That's it. cubefarm checks your machine, starts the office and opens it in your 
 - **git**
 - **The GitHub CLI**, signed in: install it from [cli.github.com](https://cli.github.com), then run `gh auth login`
 - **Claude Code, signed in**: it comes with cubefarm, so there's nothing to install. Run `npx cubefarm login` once to sign in with your Claude subscription. It's the default coding agent, and the one the CEO runs too unless you pick another for them on the CEO tab.
-- **Codex or OpenCode** (optional): if you have them installed and signed in, any agent can run them instead (see [Coding agents](#coding-agents)).
+- **Codex, OpenCode or GitHub Copilot CLI** (optional): if you have them installed and signed in, any agent can run them instead (see [Coding agents](#coding-agents)). For Copilot CLI, follow [GitHub's installation guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli) and run `copilot login`.
 - **Google Chrome**, for agents that test your app in a browser.
 
 It runs on Windows, macOS and Linux. Not sure you're ready? `npx cubefarm doctor` checks all of it.
@@ -42,15 +42,16 @@ Demo mode fakes GitHub and the agents, so it costs nothing and changes nothing.
 
 Every agent, the CEO included, is the actual coding-agent CLI in a terminal on your machine. Open someone's desk to watch their terminal live, click it to type to them, or press `Esc` in it to interrupt. They load your setup the way your own terminal sessions do: your settings, `CLAUDE.md` or `AGENTS.md`, skills, plugins and MCP servers.
 
-| | Claude Code | Codex | OpenCode |
-| --- | --- | --- | --- |
-| Install | comes with cubefarm: `npx cubefarm login` | your own, signed in | your own, signed in |
-| What the office sees | every step, plus cost and usage | every step, once you trust its hooks | each finished turn |
-| Status | the default; the CEO runs it | experimental | experimental |
+| | Claude Code | Codex | OpenCode | GitHub Copilot CLI |
+| --- | --- | --- | --- | --- |
+| Install | comes with cubefarm: `npx cubefarm login` | your own, signed in | your own, signed in | your own, signed in with `copilot login` |
+| What the office sees | every step, plus cost and usage | every step, once you trust its hooks | each finished turn | each finished turn |
+| Status | the default; the CEO runs it | experimental | experimental | experimental |
 
 - **One for everyone, or one each.** The manager's console → Settings sets the default coding agent, its model and the reasoning effort (out of the box: Claude Code with Claude Opus 5.5 at medium effort). An agent's ⚙️ Setup, the Team tab, or a new agent's chair in the lobby changes them for one agent. One subscription is all you need; mixing them (say, Codex agents testing what Claude Code agents wrote) is up to you.
 - **Local models.** Codex and OpenCode agents can run a model on your own computer instead of a subscription: give them a model named after its server, `ollama/qwen3-coder`, `lmstudio/<model>`, `llamacpp/<model>` or `omlx/<model>` (see [Local models](docs/agents.md#local-models)).
 - **Codex's hooks.** The first time, Codex asks you to review the office's hooks: type `/hooks` in a Codex agent's terminal and press `t` to trust them. Until then the office shows a Codex agent's task rather than each step.
+- **Copilot CLI sessions.** Cubefarm adds a temporary Copilot plugin for its instructions and turn-completion hooks. Workers run with Copilot's automatic tool permissions; the CEO is limited to the office MCP tools. Your Copilot sign-in and personal configuration stay in Copilot's own directory. An organization policy can limit CLI access or automatic permissions.
 - **Usage.** Agents on the same coding agent share its usage limits. When Claude warns that usage is getting high, the office slows down new work until the window resets. To cap how many agents run at once, set a session limit in the manager's console.
 - **Restarts.** Agents keep working while the office restarts (an update, a crash): their terminals live in a small process of their own and reconnect when the office is back.
 - **Cloud agents.** Optionally, agents work in an [Upstash Box](docs/cloud.md) each instead of on your computer, so they finish their task even with the office closed or your laptop shut. Connect your Upstash account in Settings → Cloud agents; your Claude subscription, API keys and GitHub are set up once for every Box.

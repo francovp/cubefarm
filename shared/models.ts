@@ -14,6 +14,7 @@ export function effectiveModel(own: string, cli: AgentCli, office: { defaultCli:
   const suits = (m: string) => {
     const model = m.trim();
     if (!model) return false;
+    if (cli === 'copilot') return model === 'auto' || /^(?:gpt|gemini)-[a-z0-9.-]+$/i.test(model) || /^claude-(?:sonnet|opus|haiku)-\d+\.\d+$/i.test(model);
     if (cli === 'claude') return isClaudeModel(model);
     if (isClaudeModel(model)) return false;
     // Codex runs bare ids; OpenCode's models are `provider/model`, and a stray bare name there now passes through
@@ -32,6 +33,7 @@ export const CLAUDE_MODELS = ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-
 export function modelSuggestions(cli: AgentCli): string[] {
   if (cli === 'claude') return CLAUDE_MODELS;
   if (cli === 'codex') return ['gpt-5.5-codex', 'gpt-5.5', 'ollama/gpt-oss:20b', 'lmstudio/openai/gpt-oss-20b'];
+  if (cli === 'copilot') return ['auto', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna', 'claude-sonnet-5.5', 'claude-opus-5.5'];
   return [...CLAUDE_MODELS.map((m) => `anthropic/${m}`), 'ollama/qwen3-coder', 'lmstudio/qwen/qwen3-coder-30b', 'llamacpp/default'];
 }
 

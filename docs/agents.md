@@ -4,7 +4,7 @@ How cubefarm thinks about its agents: interchangeable coding agents, each on a m
 
 ## An agent is an agent
 
-Every agent is the same thing: a coding-agent session (Claude Code, Codex or OpenCode) waiting for work. There are no roles, titles, job descriptions or specialties, and no QA testers set apart from developers. Whatever is next on the floor's board, any free agent takes it:
+Every agent is the same thing: a coding-agent session (Claude Code, Codex, OpenCode or GitHub Copilot CLI) waiting for work. There are no roles, titles, job descriptions or specialties, and no QA testers set apart from developers. Whatever is next on the floor's board, any free agent takes it:
 
 - **Build an issue**: a fresh worktree branch, the change, the project's checks, a pull request.
 - **QA a pull request**: review the diff, run the checks, exercise it in a browser, report.
@@ -14,7 +14,7 @@ What makes QA independent is a **fresh session**, not a different kind of agent:
 
 Fixes go back to the pull request's author while they're around (they have the session and the worktree), and to any free agent otherwise.
 
-An agent has a name and a look, for personality, and three settings: its **provider** (Claude Code, Codex or OpenCode), its **model** and its **reasoning effort**. Each falls back to the office default (Settings) when left empty. The CEO or the manager can change them; changes apply from the agent's next task.
+An agent has a name and a look, for personality, and three settings: its **provider** (Claude Code, Codex, OpenCode or GitHub Copilot CLI), its **model** and its **reasoning effort**. Each falls back to the office default (Settings) when left empty. The CEO or the manager can change them; changes apply from the agent's next task.
 
 Most people have one subscription, so the default is every agent on the same provider. Mixing providers (Codex reviewing what Claude wrote, say) is an option for those who have more than one, never a requirement.
 
@@ -64,10 +64,12 @@ Agents from before machines keep their old desk until their current task is over
 
 ### Signing in
 
-Machines on your computer use the coding agents' logins and settings there: your Claude Code, Codex and OpenCode sign-ins, skills, plugins and MCP servers, and your `gh` login. That works because the machines are folders on the same computer. Machines elsewhere need credentials of their own, and the rules differ per provider:
+Machines on your computer use the coding agents' logins and settings there: your Claude Code, Codex, OpenCode and Copilot CLI sign-ins, skills, plugins and MCP servers, and your `gh` login. That works because the machines are folders on the same computer. Machines elsewhere need credentials of their own, and the rules differ per provider:
 
 - **Never copy a login file** (`~/.claude/.credentials.json`, Codex's `auth.json`) into several machines, or from your computer into one. Their refresh tokens rotate, so the copies log each other out.
 - **Third-party apps may not collect or store claude.ai credentials or session tokens** (Anthropic's terms). cubefarm never handles a sign-in itself: it starts the coding agent's own login in that agent's terminal, you finish Anthropic's or OpenAI's flow there, and the login stays with that copy of the coding agent. cubefarm only asks whether it's signed in.
+
+OpenCode and GitHub Copilot CLI run on local machines with their own sign-ins and settings. Copilot uses `copilot login`; cubefarm does not copy its credentials. Neither CLI currently runs in a cloud Box.
 
 Cloud agents work this way today ([Signing a cloud agent in](cloud.md#signing-a-cloud-agent-in)):
 

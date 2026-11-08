@@ -28,7 +28,7 @@ const STATUS_WORDS: Record<AgentStatus, string> = {
 };
 
 /** The coding agents' names until the office has listed them (CliView.label). */
-const CLI_NAMES: Record<AgentCli, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode' };
+const CLI_NAMES: Record<AgentCli, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode', copilot: 'GitHub Copilot CLI' };
 
 type Runtime = Pick<SwarmSettings, 'runtime' | 'defaultCli'>;
 

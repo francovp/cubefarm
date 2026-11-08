@@ -57,7 +57,7 @@ export interface OfficeTools {
 }
 
 const EFFORT = z.enum(['low', 'medium', 'high', 'xhigh', 'max']);
-const CLI = z.enum(['claude', 'codex', 'opencode']);
+const CLI = z.enum(['claude', 'codex', 'opencode', 'copilot']);
 
 /** Read-only file access for a CEO without a shell. Resolve symlinks before checking the allowed roots. */
 export function officeReader(roots: string[]) {
@@ -306,7 +306,7 @@ export function scalePlan(t: TeamNow, size: number, max: number): ScalePlan {
  * How the running CLI names an office tool. Claude Code and Codex both namespace MCP tools as
  * mcp__<server>__<tool>; OpenCode joins them with a single underscore.
  */
-export const officeToolPrefix = (cli: AgentCli) => (cli === 'opencode' ? 'office_' : 'mcp__office__');
+export const officeToolPrefix = (cli: AgentCli) => cli === 'opencode' ? 'office_' : cli === 'copilot' ? 'office-' : 'mcp__office__';
 
 export function ceoSystemPrompt(o: {
   name: string;
